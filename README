@@ -1,0 +1,14 @@
+* Dependencies
+	- Javassist
+	- asm
+	- StringTemplate (ANTLR)
+	- Objenesis
+	- Cloning
+
+* Compilation
+
+	Pasc uses maven for its buildsystem. Compile with
+	
+	$ mvn install
+	
+	Tests should run cleanly 
