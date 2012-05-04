@@ -152,14 +152,14 @@ public class LightEncapsulatorGenerator {
             "       $var$Read = true;" +
             "       $if(primitive)$ " +
             "           if(state.$getter$() != replica.$getter$()) {" +
-            "               throw new com.yahoo.pasc.CorruptionException(\"States differ\", " +
-            "                   com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "               throw new com.yahoo.pasc.exceptions.VariableCorruptionException(\"$var$\", " +
+            "                   state.$getter$(), replica.$getter$());" +
             "           }" +
             "       $endif$" +
             "       $if(!primitive)$" +
             "           if(!com.yahoo.pasc.PascRuntime.compare(state.$getter$(), replica.$getter$())) {" +
-            "               throw new com.yahoo.pasc.CorruptionException(\"States differ\"," +
-            "                   com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "               throw new com.yahoo.pasc.exceptions.VariableCorruptionException(\"$var$\", " +
+            "                   state.$getter$(), replica.$getter$());" +
             "           }" +
             "       $endif$" +
             "   }" +
@@ -194,14 +194,12 @@ public class LightEncapsulatorGenerator {
             "   $type$ temp = state.$getter$(_key);" +
             "   $if(primitive)$ " +
             "       if(temp != replica.$getter$(_key)) {" +
-            "           throw new com.yahoo.pasc.CorruptionException(\"States differ\", " +
-            "               com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "           throw new com.yahoo.pasc.exceptions.VariableCorruptionException(\"$var$\", temp, replica.$getter$(_key));" +
             "       }" +
             "   $endif$" +
             "   $if(!primitive)$" +
             "       if(!com.yahoo.pasc.PascRuntime.compare(temp, replica.$getter$(_key))) {" +
-            "           throw new com.yahoo.pasc.CorruptionException(\"States differ\", " +
-            "               com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "           throw new com.yahoo.pasc.exceptions.VariableCorruptionException(\"$var$\", temp, replica.$getter$(_key));" +
             "       }" +
             "   $endif$" +
             "   $var$CacheValid = true;" +
@@ -269,7 +267,6 @@ public class LightEncapsulatorGenerator {
         setterTemplate.add("primitiveKey", primitiveKey);
         
         String result =  setterTemplate.render();
-        System.out.println("Method: " + result);
         return result;
     }
     
@@ -305,7 +302,6 @@ public class LightEncapsulatorGenerator {
         getterTemplate.add("primitiveKey", primitiveKey);
         
         String result =  getterTemplate.render();
-        System.out.println("Method: " + result);
         return result;
     }
 

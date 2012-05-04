@@ -28,16 +28,23 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.yahoo.pasc.CorruptionException;
-import com.yahoo.pasc.EqualsDeep;
-import com.yahoo.pasc.Message;
-import com.yahoo.pasc.MessageDescriptor;
-import com.yahoo.pasc.MessageHandler;
-import com.yahoo.pasc.PascRuntime;
-import com.yahoo.pasc.ProcessState;
-import com.yahoo.pasc.CorruptionException.Type;
+import com.yahoo.pasc.exceptions.AsymmetricalChangesException;
+import com.yahoo.pasc.exceptions.CorruptionException;
+import com.yahoo.pasc.exceptions.InputMessageException;
+import com.yahoo.pasc.exceptions.MessagesGenerationException;
+import com.yahoo.pasc.exceptions.VariableCorruptionException;
 
 public class RuntimeTest {
+
+    private class TestFailureHandler implements FailureHandler {
+        @Override
+        public void handleFailure(Exception e) {
+            if (e instanceof CorruptionException) {
+                throw (CorruptionException) e;
+            }
+            throw new RuntimeException(e);
+        }
+    }
 
     private static int SIZE = 100;
     private PascRuntime<State> runtime;
@@ -47,6 +54,7 @@ public class RuntimeTest {
         runtime = new PascRuntime<State>();
         runtime.setState(new State());
         runtime.addHandler(TMessage.class, new Handler());
+        runtime.setFailureHandler(new TestFailureHandler());
     }
     
     @Test
@@ -162,6 +170,34 @@ public class RuntimeTest {
             }
         }
     }
+
+    @Test
+    public void applyLastestChane() {
+        Message m = new TMessage(5);
+        m.storeReplica(m);
+        State s = runtime.getState();
+        runtime.addHandler(TMessage.class, new Handler() {
+            @Override
+            public List<TMessage> processMessage(TMessage message, State state) {
+                state.setC(Integer.toString(message.a), 33);
+                state.setC(Integer.toString(message.a + 1), 34);
+                state.setC(Integer.toString(message.a), 35);
+                return Arrays.asList(new TMessage(0));
+            }
+        });
+        List<Message> messages = runtime.handleMessage(m);
+        assertNotNull(messages);
+        assertEquals(1, messages.size());
+        for (int i = 0; i < 10; ++i) {
+            if (i == 5) {
+                assertEquals(35, s.getC(Integer.toString(i)));
+            } else if (i == 6) {
+                assertEquals(34, s.getC(Integer.toString(i)));
+            } else {
+                assertEquals(0, s.getC(Integer.toString(i)));
+            }
+        }
+    }
     
     @Test
     public void ignoreCorruptInconmingMessage() {
@@ -185,8 +221,8 @@ public class RuntimeTest {
         try {
             runtime.handleMessage(m);
             fail("Should detect corrupt replica");
-        } catch (CorruptionException e) {
-            assertEquals(Type.STATE, e.getType());
+        } catch (VariableCorruptionException e) {
+            //ignore
         }
     }
     
@@ -204,8 +240,8 @@ public class RuntimeTest {
         try {
             runtime.handleMessage(m);
             fail("Should detect corrupt message");
-        } catch (CorruptionException e) {
-            assertEquals(Type.MESSAGE, e.getType());
+        } catch (InputMessageException e) {
+            //ignore
         }
     }
 
@@ -230,8 +266,8 @@ public class RuntimeTest {
         try {
             runtime.handleMessage(m);
             fail("Should detect corrupt state");
-        } catch (CorruptionException e) {
-            assertEquals(Type.STATE, e.getType());
+        } catch (VariableCorruptionException e) {
+            //ignore
         }
     }
 
@@ -254,8 +290,8 @@ public class RuntimeTest {
         try {
             runtime.handleMessage(m);
             fail("Should detect inconsistent change");
-        } catch (CorruptionException e) {
-            assertEquals(Type.MESSAGE, e.getType());
+        } catch (MessagesGenerationException e) {
+            //ignore
         }
     }
 
@@ -280,8 +316,8 @@ public class RuntimeTest {
         try {
             runtime.handleMessage(m);
             fail("Should detect inconsistent change");
-        } catch (CorruptionException e) {
-            assertEquals(Type.STATE, e.getType());
+        } catch (AsymmetricalChangesException e) {
+            //ignore
         }
     }
 

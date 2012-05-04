@@ -14,36 +14,19 @@
  * limitations under the License. See accompanying LICENSE file.
  */
 
-package com.yahoo.pasc;
+package com.yahoo.pasc.exceptions;
+
+import java.util.List;
 
 /**
  * Exception thrown in case of message/state corruption or failure.
- *
  */
-public class CorruptionException extends RuntimeException {
-    
+public class MessagesGenerationException extends CorruptionException {
+
     private static final long serialVersionUID = 5336446438577061165L;
 
-    /**
-     * Type of corruption/failure
-     *
-     */
-    public enum Type {
-        MESSAGE, STATE, REPLICA, GUARD, CFLOW
-    }
-    
-    private final Type type;
-
-    public CorruptionException(Type type) {
-        this(null, type);
+    public MessagesGenerationException(List<?> output, List<?> replica) {
+        super(output + " != " + replica);
     }
 
-    public CorruptionException(String description, Type type) {
-        super(description);
-        this.type = type;
-    }
-
-    public Type getType() {
-        return type;
-    }
 }

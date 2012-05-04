@@ -42,11 +42,15 @@ import javassist.CtNewMethod;
 import org.objenesis.Objenesis;
 import org.objenesis.ObjenesisStd;
 import org.objenesis.instantiator.ObjectInstantiator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.stringtemplate.v4.ST;
 
 import com.yahoo.pasc.ProcessState;
 
 public class EncapsulatorGenerator {
+
+    private static final Logger LOG = LoggerFactory.getLogger(EncapsulatorGenerator.class);
 
     private Objenesis objenesis = new ObjenesisStd();
     private ObjectInstantiator instantiator;
@@ -189,7 +193,6 @@ public class EncapsulatorGenerator {
         setterTemplate.add("primitiveKey", primitiveKey);
         
         String result =  setterTemplate.render();
-        System.out.println("Method: " + result);
         return result;
     }
     
@@ -201,14 +204,14 @@ public class EncapsulatorGenerator {
             "           $var$Read = true;" +
             "           $if(primitive)$ " +
             "               if(state.$getter$() != replica.$getter$()) {" +
-            "                   throw new com.yahoo.pasc.CorruptionException(\"States differ\", " +
-            "                       com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "                   throw new com.yahoo.pasc.exceptions.VariableCorruptionException(\"$var$\", " +
+            "                       state.$getter$(), replica.$getter$());" +
             "               }" +
             "           $endif$" +
             "           $if(!primitive)$" +
             "               if(!com.yahoo.pasc.PascRuntime.compare(state.$getter$(), replica.$getter$())) {" +
-            "                   throw new com.yahoo.pasc.CorruptionException(\"States differ\"," +
-            "                       com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "                   throw new com.yahoo.pasc.exceptions.VariableCorruptionException(\"$var$\", " +
+            "                       state.$getter$(), replica.$getter$());" +
             "               }" +
             "           $endif$" +
             "       }" +
@@ -252,15 +255,13 @@ public class EncapsulatorGenerator {
             "   $if(primitive)$ " +
             "       $type$ temp = state.$getter$(_key);" +
             "       if(temp != replica.$getter$(_key)) {" +
-            "           throw new com.yahoo.pasc.CorruptionException(\"States differ\", " +
-            "               com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "           throw new com.yahoo.pasc.exceptions.VariableCorruptionException(\"$var$\", temp, replica.$getter$(_key));" +
             "       }" +
             "   $endif$" +
             "   $if(!primitive)$" +
             "       $type$ temp = $objectCast$ com.yahoo.pasc.PascRuntime.clone(state.$getter$(_key));" +
             "       if(!com.yahoo.pasc.PascRuntime.compare(temp, replica.$getter$(_key))) {" +
-            "           throw new com.yahoo.pasc.CorruptionException(\"States differ\", " +
-            "               com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "           throw new com.yahoo.pasc.exceptions.VariableCorruptionException(\"$var$\", temp, replica.$getter$(_key));" +
             "       }" +
             "   $endif$" +
             //  Write in cache
@@ -337,7 +338,7 @@ public class EncapsulatorGenerator {
         getterTemplate.add("mapGet", mapGet);
         
         String result =  getterTemplate.render();
-        System.out.println("Method: " + result);
+        LOG.trace("Method: {}", result);
         return result;
     }
 
@@ -375,29 +376,17 @@ public class EncapsulatorGenerator {
     private String applySingle = addNewLines(
             "   if($var$Written) {" +
             "       if(!lightEncap.$var$Read)" +
-            "           throw new com.yahoo.pasc.CorruptionException(\"Written records don't match.\"," +
-            "               com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "           throw new com.yahoo.pasc.exceptions.AsymmetricalChangesException(\"$var$\", null, null);" +
             "       if(!$var$Read)" +
-            "           throw new com.yahoo.pasc.CorruptionException(\"Written records don't match.\"," +
-            "               com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "           throw new com.yahoo.pasc.exceptions.AsymmetricalChangesException(\"$var$\", null, null);" +
             "       temp.$setter$($var$Ref);" +
             "   }");
     
     private String applyMulti = addNewLines(
             "   if ($var$CacheValid) {" +
-            "       $typeKey$ tempKey = $var$LatestKey;" +
-            "       $typeKey$ replicaKey = lightEncap.$var$LatestKey;" +
-            "       $if(primitiveKey)$" +
-            "           if(tempKey != replicaKey) " +
-            "               throw new com.yahoo.pasc.CorruptionException(\"$var$ cached keys don't match.\"," +
-            "                   com.yahoo.pasc.CorruptionException.Type.STATE);" +
-            "       $endif$" +
-            "       $if(!primitiveKey)$" +
-            "           if(!((Object)tempKey).equals(replicaKey)) " +
-            "               throw new com.yahoo.pasc.CorruptionException(\"$var$ cached keys don't match. 2\"," +
-            "                   com.yahoo.pasc.CorruptionException.Type.STATE);" +
-            "       $endif$" +
-            "       temp.$setter$($var$LatestKey, $var$LatestValue);" +
+            "       $typeKey$ tempKey;" +
+            "       $typeKey$ replicaKey;" +
+            // First apply changes from the map
             "       if ($var$Written != null && !$var$Written.isEmpty()) {" +
             "           it.unimi.dsi.fastutil.objects.ObjectIterator it = $var$Written.$entrySetName$().fastIterator();" +
             "           $iteratorName$ itl = lightEncap.$var$Read.iterator();" +
@@ -407,23 +396,31 @@ public class EncapsulatorGenerator {
             "               replicaKey = $castKey$ itl.$nextName$();" +
             "               $if(primitiveKey)$" +
             "                   if(tempKey != replicaKey) " +
-            "                       throw new com.yahoo.pasc.CorruptionException(\"$var$ written map keys don't match.\"," +
-            "                           com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "                       throw new com.yahoo.pasc.exceptions.AsymmetricalChangesException(\"$var$\", tempKey, replicaKey);" +
             "               $endif$" +
             "               $if(!primitiveKey)$" +
             "                   if(!((Object)tempKey).equals(replicaKey)) " +
-            "                       throw new com.yahoo.pasc.CorruptionException(\"$var$ written map keys don't match.\"," +
-            "                           com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "                       throw new com.yahoo.pasc.exceptions.AsymmetricalChangesException(\"$var$\", tempKey, replicaKey);" +
             "               $endif$" +
             "               temp.$setter$($castKey$ tempKey, $castValue$ entry.get$valueName$());" +
             "           }" +
             "           if (itl.hasNext())  " +
-            "               throw new com.yahoo.pasc.CorruptionException(\"Written records don't match. 5\"," +
-            "                   com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "               throw new com.yahoo.pasc.exceptions.AsymmetricalChangesException(\"$var$\", null, itl.next());" +
             "       } else if (($var$Read != null && !$var$Read.isEmpty()) || " +
             "               (lightEncap.$var$Read != null && !lightEncap.$var$Read.isEmpty()))  " +
-            "           throw new com.yahoo.pasc.CorruptionException(\"$var$ empty written, non empty read\"," +
-            "               com.yahoo.pasc.CorruptionException.Type.STATE);" +
+            "           throw new com.yahoo.pasc.exceptions.AsymmetricalChangesException(\"$var$\", null, null);" +
+            // then apply changes from the cache (modified last)
+            "       tempKey = $var$LatestKey;" +
+            "       replicaKey = lightEncap.$var$LatestKey;" +
+            "       $if(primitiveKey)$" +
+            "           if(tempKey != replicaKey) " +
+            "               throw new com.yahoo.pasc.exceptions.AsymmetricalChangesException(\"$var$\", tempKey, replicaKey);" +
+            "       $endif$" +
+            "       $if(!primitiveKey)$" +
+            "           if(!((Object)tempKey).equals(replicaKey)) " +
+            "               throw new com.yahoo.pasc.exceptions.AsymmetricalChangesException(\"$var$\", tempKey, replicaKey);" +
+            "       $endif$" +
+            "       temp.$setter$($var$LatestKey, $var$LatestValue);" +
             "   }"
             );
 
@@ -466,8 +463,6 @@ public class EncapsulatorGenerator {
         ST method = new ST(applyModifications, '$', '$');
         method.add("className", className);
         method.add("variableApplications", applications);
-        
-        System.out.println("Apply modifications: \n " + method.render());
         
         return method.render();
     }

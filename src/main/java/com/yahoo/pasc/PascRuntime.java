@@ -27,7 +27,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.rits.cloning.Cloner;
-import com.yahoo.pasc.CorruptionException.Type;
+import com.yahoo.pasc.exceptions.ControlFlowException;
+import com.yahoo.pasc.exceptions.GuardException;
+import com.yahoo.pasc.exceptions.InputMessageException;
+import com.yahoo.pasc.exceptions.MessagesGenerationException;
+import com.yahoo.pasc.exceptions.VariableCorruptionException;
 import com.yahoo.pasc.generation.Encapsulator;
 import com.yahoo.pasc.generation.EncapsulatorGenerator;
 import com.yahoo.pasc.generation.LightEncapsulatorGenerator;
@@ -50,6 +54,8 @@ public final class PascRuntime<S extends ProcessState> {
     private S state;
     private S replica;
 
+    private FailureHandler failureHandler = new CrashFailureHandler();
+
     private static Cloner cloner = new Cloner();
 
     /**
@@ -62,6 +68,9 @@ public final class PascRuntime<S extends ProcessState> {
      */
     @SuppressWarnings("unchecked")
     public static <T> T clone(T object) {
+        if (object instanceof ReadOnly) {
+            return object;
+        }
         if (object instanceof CloneableDeep) {
             return (T) ((CloneableDeep<T>)object).cloneDeep();
         }
@@ -120,6 +129,7 @@ public final class PascRuntime<S extends ProcessState> {
     private EncapsulatorGenerator encapsulatorGenerator;
     private LightEncapsulatorGenerator lightEncapsulatorGenerator;
     private final boolean protection;
+    private final boolean protectionReplica;
 
     /**
      * Create a new runtime with protection against failures
@@ -134,7 +144,7 @@ public final class PascRuntime<S extends ProcessState> {
      * @param protection Whether to use protection against corruptions/failures or not
      */
     public PascRuntime(boolean protection) {
-        this.protection = protection;
+        this.protectionReplica = this.protection = protection;
     }
 
     private final List<Message> emptyMessages = Collections.emptyList();
@@ -158,13 +168,21 @@ public final class PascRuntime<S extends ProcessState> {
             LOG.warn("Handler's guard predicate doesn't hold: {} {}", handler, receivedMessage);
             return emptyMessages;
         }
-        if (protection) {
-            return invoke(handler, receivedMessage, control);
-        } else {
-            return unsafeInvoke(handler, receivedMessage);
+        try {
+            if (protection != protectionReplica) {
+                throw new VariableCorruptionException("protection", protection, protectionReplica);
+            }
+            if (protection) {
+                return invoke(handler, receivedMessage, control);
+            } else {
+                return unsafeInvoke(handler, receivedMessage);
+            }
+        } catch (Exception e) {
+            failureHandler.handleFailure(e);
+            return emptyMessages;
         }
     }
-    
+
     private <D> List<Message> unsafeInvoke(final MessageHandler<Message, S, D> handler, 
             final Message receivedMessage) {
           receivedMessage.verify();
@@ -231,7 +249,7 @@ public final class PascRuntime<S extends ProcessState> {
         // check control flow
         cfl = cfl_ = ControlFlow.SET;
         if (control.cfs != control.cfr || control.cfs != ControlFlow.RESET) {
-            throw new CorruptionException("cf ­ cfr or cf ­ RESET", Type.CFLOW);
+            throw new ControlFlowException("cf =/= cfr or cf =/= RESET");
         }
         control.cfs = control.cfr = ControlFlow.SET;
 
@@ -240,7 +258,7 @@ public final class PascRuntime<S extends ProcessState> {
         List<D> replicaDescriptors = handler.processMessage(clonedMessage, (S) replicaEncapsulator);
 
         if (control.cf_s != control.cf_r || control.cf_s != ControlFlow.RESET) {
-            throw new CorruptionException("cf_s ­ cf_r or cf_s ­ RESET", Type.CFLOW);
+            throw new ControlFlowException("cf_s =/= cf_r or cf_s =/= RESET");
         }
         control.cf_s = control.cf_r = ControlFlow.SET;
         cf_l = cf_l_ = ControlFlow.SET;
@@ -250,29 +268,29 @@ public final class PascRuntime<S extends ProcessState> {
 
         // check control flow
         if (cfl != cfl_ || cfl != ControlFlow.SET) {
-            throw new CorruptionException("cfl ­ cfl_ or cfl ­ SET", Type.CFLOW);
+            throw new ControlFlowException("cfl =/= cfl_ or cfl =/= SET");
         }
         if (cf_l != cf_l_ || cf_l != ControlFlow.SET) {
-            throw new CorruptionException("cf_l ­ cf_l_ or cf_l ­ SET", Type.CFLOW);
+            throw new ControlFlowException("cf_l =/= cf_l_ or cf_l =/= SET");
         }
         if (control.cf__s != control.cf__r || control.cf__s != ControlFlow.RESET) {
-            throw new CorruptionException("cf__s ­ cf__r or cf__s ­ RESET", Type.CFLOW);
+            throw new ControlFlowException("cf__s =/= cf__r or cf__s =/= RESET");
         }
         control.cf__s = control.cf__r = ControlFlow.SET;
         
         if (descriptors != null && replicaDescriptors != null) {
             if (descriptors.size() != replicaDescriptors.size()) {
-                throw new CorruptionException("Descriptors don't match", Type.MESSAGE);
+                throw new MessagesGenerationException(descriptors, replicaDescriptors);
             }
             Iterator<?> it = descriptors.iterator();
             Iterator<?> itr = replicaDescriptors.iterator();
             while(it.hasNext()) {
                 if (!compare(it.next(), itr.next())) {
-                    throw new CorruptionException("Descriptors don't match", Type.MESSAGE);
+                    throw new MessagesGenerationException(descriptors, replicaDescriptors);
                 }
             }
         } else if (descriptors != null || replicaDescriptors != null) {
-            throw new CorruptionException("Descriptors don't match", Type.MESSAGE);
+            throw new MessagesGenerationException(descriptors, replicaDescriptors);
         }
 
         // generate messages
@@ -306,15 +324,15 @@ public final class PascRuntime<S extends ProcessState> {
         
         // verify input message again
         if (!compare(receivedMessage, result.clonedMessage)) {
-            throw new CorruptionException("m ­ m'", Type.MESSAGE);
+            throw new InputMessageException("Not equal", receivedMessage, result.clonedMessage);
         }
         if (!receivedMessage.verify()) {
-            throw new CorruptionException("Corrupted message ", Type.MESSAGE);
+            throw new InputMessageException("Verification failed", receivedMessage, result.clonedMessage);
         }
 
         // verify guard
         if (!handler.guardPredicate(receivedMessage)) {
-            throw new CorruptionException("Guard doesn't hold", Type.GUARD);
+            throw new GuardException("Guard doesn't hold", handler, receivedMessage);
         }
         
         responses = result.responses;
@@ -344,5 +362,13 @@ public final class PascRuntime<S extends ProcessState> {
     
     S getReplica() {
         return replica;
+    }
+
+    public FailureHandler getFailureHandler() {
+        return failureHandler;
+    }
+
+    public void setFailureHandler(FailureHandler failureHandler) {
+        this.failureHandler = failureHandler;
     }
 }

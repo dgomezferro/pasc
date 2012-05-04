@@ -27,12 +27,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.yahoo.pasc.CorruptionException;
 import com.yahoo.pasc.ProcessState;
-import com.yahoo.pasc.CorruptionException.Type;
-import com.yahoo.pasc.generation.Encapsulator;
-import com.yahoo.pasc.generation.EncapsulatorGenerator;
-import com.yahoo.pasc.generation.LightEncapsulatorGenerator;
+import com.yahoo.pasc.exceptions.AsymmetricalChangesException;
+import com.yahoo.pasc.exceptions.VariableCorruptionException;
 
 public class EncapsulatorTest {
     private static EncapsulatorGenerator generator;
@@ -109,8 +106,8 @@ public class EncapsulatorTest {
         try {
             encapsulator.applyModifications(false, lightEncapsulator);
             fail("Didn't raise exception");
-        } catch (CorruptionException e) {
-            assertEquals(Type.STATE, e.getType());
+        } catch (AsymmetricalChangesException e) {
+            //ignore
         }
     }
 
@@ -122,8 +119,8 @@ public class EncapsulatorTest {
         try {
             wrappedState.getA();
             fail("Didn't raise exception");
-        } catch (CorruptionException e) {
-            assertEquals(Type.STATE, e.getType());
+        } catch (VariableCorruptionException e) {
+            //ignore
         }
     }
 
