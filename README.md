@@ -26,13 +26,13 @@ The PASC library uses five techniques to handle ASC faults: state replication, r
 
 The PASC runtime is initialized when the process is started. 
 
-final PascRuntime runtime = new PascRuntime(protection);
+    final PascRuntime runtime = new PascRuntime(protection);
 
 The protection flag allows to turn off PASC if needed.
 
 The initialization procedure must pass the process state, message handler and message classes used to the runtime. During the normal operations, all is needed to process an input message is to tell the runtime to handle the message. 
 
-List<Message> outputMessages = runtime.handleMessage(inputMessage)
+    List<Message> outputMessages = runtime.handleMessage(inputMessage)
 
 Compilation
 -----------
