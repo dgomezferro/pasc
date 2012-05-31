@@ -351,7 +351,7 @@ public class RuntimeTest {
         }
     }
     
-    private static class TMessage extends Message implements MessageDescriptor, EqualsDeep<TMessage> {
+    private static class TMessage extends Message implements EqualsDeep<TMessage> {
         int a;
         int crc;
         
