@@ -189,7 +189,7 @@ public final class PascRuntime<S extends ProcessState> {
           List<Message> result;
           synchronized (this) {
               List<D> descriptors = handler.processMessage(receivedMessage, state);
-              result = handler.getSendMessages(state, descriptors);
+              result = handler.getOutputMessages(state, descriptors);
           }
           if (result != null) {
               for (Message m : result) {
@@ -294,8 +294,8 @@ public final class PascRuntime<S extends ProcessState> {
         }
 
         // generate messages
-        result.responses = handler.getSendMessages(state, descriptors);
-        result.replicas = handler.getSendMessages(replica, replicaDescriptors);
+        result.responses = handler.getOutputMessages(state, descriptors);
+        result.replicas = handler.getOutputMessages(replica, replicaDescriptors);
     }
 
     private <D> List<Message> invoke(final MessageHandler<Message, S, D> handler, 

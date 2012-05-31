@@ -394,7 +394,7 @@ public class RuntimeTest {
         }
 
         @Override
-        public List<Message> getSendMessages(State state, List<TMessage> descriptors) {
+        public List<Message> getOutputMessages(State state, List<TMessage> descriptors) {
             return descriptors == null ? null : Collections.<Message>unmodifiableList(descriptors);
         }
         

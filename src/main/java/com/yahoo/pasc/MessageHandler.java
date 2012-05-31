@@ -59,6 +59,6 @@ public interface MessageHandler<M extends Message, S extends ProcessState, D> {
      * @param descriptors Generated descriptors by processMessage()
      * @return List of output messages, or null
      */
-    public List<Message> getSendMessages(S state, List<D> descriptors);
+    public List<Message> getOutputMessages(S state, List<D> descriptors);
 	
 }

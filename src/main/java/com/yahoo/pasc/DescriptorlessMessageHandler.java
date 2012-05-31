@@ -37,7 +37,7 @@ public abstract class DescriptorlessMessageHandler <M extends Message, S extends
      * @param state Current state, can be mutated
      * @return List of message descriptors or null
      */
-    public final List<Message> getSendMessages(S state, List<Message> descriptors) {
+    public final List<Message> getOutputMessages(S state, List<Message> descriptors) {
         return descriptors;
     };
 }
