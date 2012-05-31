@@ -380,8 +380,8 @@ public class RuntimeTest {
     private static class Handler implements MessageHandler<TMessage, State, TMessage> {
 
         @Override
-        public boolean guardPredicate(Message receivedMessage) {
-            return receivedMessage instanceof TMessage;
+        public boolean guardPredicate(TMessage receivedMessage) {
+            return true;
         }
 
         @Override

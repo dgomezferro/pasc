@@ -36,7 +36,7 @@ public interface MessageHandler<M extends Message, S extends ProcessState, D> {
      * @param receivedMessage Message to be checked
      * @return true if this handler is the one that should be executed
      */
-    public boolean guardPredicate(Message receivedMessage);
+    public boolean guardPredicate(M receivedMessage);
 
     /**
      * Processes a received message.
