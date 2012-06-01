@@ -1,11 +1,9 @@
 PASC
 ====
 
-PASC is a Java library that automates the detection of Arbitrary State Corruptions in processes of a distributed system.
-
 Fault-tolerant distributed systems need to tolerate not only crashes but also random data corruptions due to disk failures, bit-flips in memory, or CPU/bus errors. These random errors can propagate and have unpredictable effects. However, manually adding error detection checks is cumbersome and difficult. Which checks need to be added? Where to place them? What if the variables used for the checks are themselves corrupted?
 
-The motivation behind PASC is that developers should not care about these problems. They should focus on making their distributed system crash-tolerant. The PASC library wraps the processes of the system and takes care of executing all the checks that are necessary to transform arbitrary state corruptions into crashes and dropped messages. All this is transparent to the application. If a faulty process wrapped with PASC sends a corrupted messages, this corruption is exposed to the receiver, which discards the message. 
+PASC is a Java library that automates the detection of Arbitrary State Corruption faults in processes of a distributed system. The motivation behind PASC is that developers should not care about these problems. They should focus on making their distributed system crash-tolerant. The PASC library wraps the processes of the system and takes care of executing all the checks that are necessary to transform arbitrary state corruptions into crashes and dropped messages. All this is transparent to the application. If a faulty process wrapped with PASC sends a corrupted messages, this corruption is exposed to the receiver, which discards the message. 
 
 If you have any question, please contact us at pasc-library@yahoogroups.com
 
