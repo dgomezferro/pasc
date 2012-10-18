@@ -172,7 +172,7 @@ public final class PascRuntime<S extends ProcessState> {
             if (protection != protectionReplica) {
                 throw new VariableCorruptionException("protection", protection, protectionReplica);
             }
-            if (protection) {
+            if (protection || protectionReplica) {
                 return invoke(handler, receivedMessage, control);
             } else {
                 return unsafeInvoke(handler, receivedMessage);
@@ -370,5 +370,9 @@ public final class PascRuntime<S extends ProcessState> {
 
     public void setFailureHandler(FailureHandler failureHandler) {
         this.failureHandler = failureHandler;
+    }
+
+    public boolean isProtected() {
+        return protection;
     }
 }
